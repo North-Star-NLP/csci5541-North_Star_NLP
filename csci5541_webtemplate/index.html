@@ -20,22 +20,35 @@
 <body>
   <div>
     <div class="wrapper">
-      <h1 style="font-family: &#39;Lato&#39;, sans-serif;">Your Title Here</h1>
-      <h4 style="font-family: &#39;Lato&#39;, sans-serif; ">Fall 2024 CSCI 5541 NLP: Class Project - University of Minnesota</h4>
-      <h4 style="font-family: &#39;Lato&#39;, sans-serif; ">Team Name</h4>
+      <h1 style="font-family: &#39;Lato&#39;, sans-serif;">Measuring and Defending Against Indirect Prompt Injection in Retrieval-Augmented Generation</h1>
+      <h4 style="font-family: &#39;Lato&#39;, sans-serif; ">Spring 2026 CSCI 5541 NLP: Class Project - University of Minnesota</h4>
+      <h4 style="font-family: &#39;Lato&#39;, sans-serif; ">NorthStar NLP</h4>
 
       <div class="authors-wrapper">
         
         <div class="author-container">
           <div class="author-image">
                         
-              <img src="">
+              <img src="files/headshot_placeholder.png" alt="Logan Oakley">
             
             
           </div>
           <p>
                         
-              Member 1
+              Logan <br> Oakley
+
+          </p>
+        </div>
+        
+        <div class="author-container">
+          <div class="author-image">
+            
+            <img src="files/headshot_placeholder.png" alt="Zhixing Jiang">
+            
+          </div>
+          <p>
+            
+            Zhixing (Sean) <br> Jiang
             
           </p>
         </div>
@@ -43,35 +56,22 @@
         <div class="author-container">
           <div class="author-image">
             
-            <img src="">
+              <img src="files/headshot_placeholder.png" alt="Samuel Kekeocha">            
             
           </div>
           <p>
-            
-            Member 2
-            
-          </p>
-        </div>
-        
-        <div class="author-container">
-          <div class="author-image">
-            
-              <img src="">            
-            
-          </div>
-          <p>
-              Member 3
+              Samuel <br> Kekeocha
           </p>
         </div>
         
         <div class="author-container">
           <div class="author-image">
                         
-              <img src="">
+              <img src="files/headshot_placeholder.png" alt="Emmanuel Mongare">
             
           </div>
           <p>
-            Member 4
+            Emmanuel <br> Mongare
           </p>
         </div>
         
@@ -93,7 +93,7 @@
           </span>
           <span class="link-block">
             <a
-              href=""
+              href="https://github.com/oakle072-spec/csci5541-North_Star_NLP/tree/main"
               target="_blank"
               class="external-link button is-normal is-rounded is-dark is-outlined"
             >
@@ -129,7 +129,8 @@
     
     <h2 id="abstract">Abstract</h2>
 
-<p>One or two sentences on the motivation behind the problem you are solving. One or two sentences describing the approach you took. One or two sentences on the main result you obtained.</p>
+<p>The motivation for this project is that RAG systems often rely on retrieved content from untrusted sources, and malicious documents can contain indirect prompt injections that cause the model to ignore the user’s question or follow attacker instructions. This creates a security–utility tradeoff, since stronger defenses may reduce attacks but also hurt answer quality.
+Our approach is to build a controlled benchmark of roughly 300 cases, including clean examples, explicit injection attacks, and semantically disguised injections, and evaluate a baseline RAG pipeline with defensive prompting and lightweight content filtering. We measure both Attack Success Rate and answer accuracy to compare robustness and utility across defense settings.</p>
 
 <hr>
 
@@ -152,15 +153,15 @@
 <b>What did you try to do? What problem did you try to solve? Articulate your objectives using absolutely no jargon.</b>
 </p>
 <p>
-Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-</p>
+In this project, we examine whether an LLM can be influenced by malicious instructions hidden inside the evidence it retrieves to answer a question. Our goal is to understand how often these hidden instructions can cause the LLM to ignore the user’s actual request or produce an answer that does not match the intended task. We also study whether simple protective methods can reduce this problem while still allowing the LLM to remain useful and accurate when the retrieved documents are normal and trustworthy. More specifically, the project focuses on measuring the attack success rate of different prompt injection attacks, evaluating several defense strategies, and exploring the relationship among attack success rate, defense strategy, and answer accuracy.</p>
 
 <p>
 <b>How is it done today, and what are the limits of current practice?</b>
 </p>
 <p>
-Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
-<p>
+Current work usually studies indirect prompt injection by building attack cases in which malicious instructions are hidden inside retrieved documents and then testing whether an LLM follows those instructions instead of the user’s request. Prior research has shown that modern LLM-based systems can often resist at least some indirect prompt injection attacks, especially when prompting or filtering defenses are applied, which means attack success rates may already be relatively low in many settings.
+<br> <br>
+The main limitation of current practice, however, is that low attack success rates do not fully answer the broader question of how defenses affect overall system behavior. Even if our experiments do not produce large differences in attack success rate, it is still valuable to study the relationship among attack success rate, defense strategy, and answer accuracy. That relationship may seem intuitive, but it is still worth measuring directly, because defenses that improve safety can also reduce answer quality, and careful experiments are needed to make that tradeoff visible rather than assumed.<p>
 
 <p>
 <b>Who cares? If you are successful, what difference will it make?</b>
