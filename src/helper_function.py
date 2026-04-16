@@ -135,15 +135,20 @@ def _load_json_files(path: str) -> list[dict]:
 
 
 def _records_to_documents(records: list[dict], text_key: str = "text", source_key: str = "source") -> list[Document]:
-    """Convert JSON records to LangChain Documents."""
+    """Convert JSON records to LangChain Documents, preserving id and is_poison metadata."""
     docs = []
     for record in records:
         content = record.get(text_key, "")
         if not content:
             content = json.dumps(record, ensure_ascii=False)
+        
+        # Build metadata, preserving all fields except text_key
         metadata = {k: v for k, v in record.items() if k != text_key}
+        
+        # Ensure source_key is present
         if source_key not in metadata:
             metadata[source_key] = "json_import"
+        
         docs.append(Document(page_content=content, metadata=metadata))
     return docs
 
