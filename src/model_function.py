@@ -74,5 +74,5 @@ def load_judge_model(
         do_sample=False,
         temperature=0.0,
         return_full_text=False,
-        max_new_tokens=128,
+        max_new_tokens=256,
     )
