@@ -47,3 +47,32 @@ def load_reader_model(
         return_full_text=False,
         max_new_tokens=500,
     )
+
+
+def load_judge_model(
+    model_name: str = "Qwen/Qwen2.5-3B-Instruct",
+    local_path: str = "models/qwen2.5-3b-judge",
+):
+    device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
+
+    if os.path.exists(local_path):
+        print(f"Loading judge model from local '{local_path}' on {device}...")
+        model = AutoModelForCausalLM.from_pretrained(local_path).to(device)
+        tokenizer = AutoTokenizer.from_pretrained(local_path)
+    else:
+        print(f"Downloading judge model '{model_name}' on {device}...")
+        model = AutoModelForCausalLM.from_pretrained(model_name).to(device)
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        model.save_pretrained(local_path)
+        tokenizer.save_pretrained(local_path)
+        print(f"Judge model saved to '{local_path}'")
+
+    return pipeline(
+        model=model,
+        tokenizer=tokenizer,
+        task="text-generation",
+        do_sample=False,
+        temperature=0.0,
+        return_full_text=False,
+        max_new_tokens=128,
+    )
