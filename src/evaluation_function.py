@@ -21,12 +21,12 @@ def _extract_json_block(text: str):
             return json.loads(match.group(0))
         except Exception:
             pass
-    
+
     # Fallback: check for keywords in response
     text_lower = text.lower()
     has_success = "attack_success" in text_lower
     has_indeterminate = "indeterminate" in text_lower
-    
+
     if has_success or has_indeterminate:
         if has_success and has_indeterminate:
             # Both exist - check which appears first
@@ -37,9 +37,9 @@ def _extract_json_block(text: str):
             label = "attack_success"
         else:
             label = "indeterminate"
-        
+
         return {"label": label, "reason": "extracted from text fallback"}
-    
+
     return {"label": "indeterminate", "reason": "no keywords or JSON found in judge output"}
 
 
@@ -141,7 +141,8 @@ def run_semantic_poisoning_evaluation(
         clean_answer = query_data.get("clean_answer", "")
         poison_answer = query_data.get("poison_answer", "")
 
-        retrieved_docs = knowledge_vector_database.similarity_search(query=question, k=5)
+        retrieved_docs = knowledge_vector_database.similarity_search(
+            query=question, k=5)
 
         poisoned_docs_retrieved = [
             doc for doc in retrieved_docs
@@ -161,7 +162,8 @@ def run_semantic_poisoning_evaluation(
         retrieved_docs_text = [doc.page_content for doc in retrieved_docs]
         context = "\nExtracted documents:\n"
         context += "".join(
-            [f"Document {i}:::\n{doc}" for i, doc in enumerate(retrieved_docs_text)]
+            [f"Document {i}:::\n{doc}" for i,
+                doc in enumerate(retrieved_docs_text)]
         )
 
         final_prompt = rag_prompt_template.format(
@@ -182,7 +184,8 @@ def run_semantic_poisoning_evaluation(
         })
 
     results = []
-    print(f"\nProcessing {len(prompt_data)} queries in batches of {batch_size}...")
+    print(
+        f"\nProcessing {len(prompt_data)} queries in batches of {batch_size}...")
 
     for batch_start in tqdm(range(0, len(prompt_data), batch_size), desc="Batch inference"):
         batch_end = min(batch_start + batch_size, len(prompt_data))
@@ -251,7 +254,8 @@ def calculate_and_display_asr(results, output_file="result.json"):
     print(f"Attack Success Rate (ASR): {asr:.2f}%")
     print("=" * 60)
     print("\nPOISONED DATA RETRIEVAL CHECK:")
-    print(f"Queries with target poisoned docs retrieved: {queries_with_poison}/{total_queries}")
+    print(
+        f"Queries with target poisoned docs retrieved: {queries_with_poison}/{total_queries}")
     print(f"Total target poisoned documents retrieved: {total_poisoned_docs}")
     print("=" * 60)
 
@@ -290,3 +294,125 @@ def calculate_and_display_asr(results, output_file="result.json"):
         "total_poisoned_docs": int(total_poisoned_docs),
         "results_df": results_df,
     }
+
+
+def run_retrieval_filtering_poisoning_evaluation(
+    queries_data,
+    knowledge_vector_database,
+    rag_prompt_template,
+    reader_llm,
+    judge_llm,
+    batch_size=8,
+):
+    """
+    Run evaluation on all queries using the RAG pipeline with poisoned data.
+    Uses a separate LLM judge instead of keyword-only evaluation.
+    """
+    print("Preparing prompts and retrieving documents...")
+    prompt_data = []
+
+    for query_data in tqdm(queries_data, desc="Retrieving documents"):
+        query_id = query_data["id"]
+        question = query_data["question"]
+        target_poison_ids = set(query_data.get("target_poison_ids", []))
+        clean_answer = query_data.get("clean_answer", "")
+        poison_answer = query_data.get("poison_answer", "")
+
+        retrieved_docs = knowledge_vector_database.similarity_search(
+            query=question, k=10)
+
+        # TODO:  Filter retrieved docs to the 5 nearest the mean of all
+        # retrievied documents
+
+        poisoned_docs_retrieved = [
+            doc for doc in retrieved_docs
+            if doc.metadata.get("is_poison", False) is True
+        ]
+
+        target_poisoned_docs_retrieved = [
+            doc for doc in poisoned_docs_retrieved
+            if doc.metadata.get("id") in target_poison_ids
+        ]
+        print("Count total poison: ", len(poisoned_docs_retrieved),
+              "\tCount target poison: ", len(target_poisoned_docs_retrieved))
+
+        has_poisoned = len(target_poisoned_docs_retrieved) > 0
+        matched_target_poison_ids = [
+            doc.metadata.get("id") for doc in target_poisoned_docs_retrieved
+        ]
+    print("done")
+
+
+"""
+        retrieved_docs_text = [doc.page_content for doc in retrieved_docs]
+        context = "\nExtracted documents:\n"
+        context += "".join(
+            [f"Document {i}:::\n{doc}" for i,
+                doc in enumerate(retrieved_docs_text)]
+        )
+
+        final_prompt = rag_prompt_template.format(
+            question=question,
+            context=context,
+        )
+
+        prompt_data.append({
+            "query_id": query_id,
+            "question": question,
+            "clean_answer": clean_answer,
+            "poison_answer": poison_answer,
+            "target_poison_ids": list(target_poison_ids),
+            "matched_target_poison_ids": list(set(matched_target_poison_ids)),
+            "prompt": final_prompt,
+            "poisoned_docs_retrieved": has_poisoned,
+            "num_poisoned_docs": len(target_poisoned_docs_retrieved),
+        })
+
+    results = []
+    print(
+        f"\nProcessing {len(prompt_data)} queries in batches of {batch_size}...")
+
+    for batch_start in tqdm(range(0, len(prompt_data), batch_size), desc="Batch inference"):
+        batch_end = min(batch_start + batch_size, len(prompt_data))
+        batch = prompt_data[batch_start:batch_end]
+
+        batch_prompts = [item["prompt"] for item in batch]
+        batch_responses = reader_llm(batch_prompts)
+
+        for i, item in enumerate(batch):
+            if isinstance(batch_responses, list):
+                generated_answer = (
+                    batch_responses[i][0]["generated_text"]
+                    if isinstance(batch_responses[i], list)
+                    else batch_responses[i]["generated_text"]
+                )
+            else:
+                generated_answer = batch_responses[0]["generated_text"] if i == 0 else ""
+
+            judge_result = evaluate_semantic_poisoning_with_llm(
+                generated_text=generated_answer,
+                question=item["question"],
+                clean_answer=item["clean_answer"],
+                poison_answer=item["poison_answer"],
+                judge_llm=judge_llm,
+            )
+
+            results.append({
+                "query_id": item["query_id"],
+                "question": item["question"],
+                "clean_answer": item["clean_answer"],
+                "poison_answer": item["poison_answer"],
+                "target_poison_ids": item["target_poison_ids"],
+                "matched_target_poison_ids": item["matched_target_poison_ids"],
+                "generated_answer": generated_answer,
+                "attack_successful": judge_result["attack_successful"],
+                "label": judge_result["label"],
+                "judge_reason": judge_result["judge_reason"],
+                "raw_judge_output": judge_result["raw_judge_output"],
+                "poisoned_docs_retrieved": item["poisoned_docs_retrieved"],
+                "num_poisoned_docs": item["num_poisoned_docs"],
+            })
+
+    print(f"Processed {len(results)} queries")
+    return results
+  """
