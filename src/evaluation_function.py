@@ -2,6 +2,7 @@ from tqdm.notebook import tqdm
 import pandas as pd
 import json
 import re
+import numpy as np
 
 
 def _extract_json_block(text: str):
@@ -317,33 +318,46 @@ def run_retrieval_filtering_poisoning_evaluation(
         target_poison_ids = set(query_data.get("target_poison_ids", []))
         clean_answer = query_data.get("clean_answer", "")
         poison_answer = query_data.get("poison_answer", "")
-
-        retrieved_docs = knowledge_vector_database.similarity_search(
-            query=question, k=10)
-
-        # TODO:  Filter retrieved docs to the 5 nearest the mean of all
-        # retrievied documents
-
+  
+        query_embedding = knowledge_vector_database.embedding_function.embed_query(question)
+        
+        D, I = knowledge_vector_database.index.search(
+            np.array([query_embedding]), k=10
+        )
+        
+        indices = I[0]
+        
+        vectors = np.array([knowledge_vector_database.index.reconstruct(int(i)) for i in indices])
+        
+        centroid = np.mean(vectors, axis=0)
+        
+        distances = np.linalg.norm(vectors - centroid, axis=1)
+        
+        top5_idx = np.argsort(distances)[:5]
+        final_indices = indices[top5_idx]
+        
+        retrieved_docs = [
+            knowledge_vector_database.docstore.search(
+                knowledge_vector_database.index_to_docstore_id[i]
+            )
+            for i in final_indices
+        ]
+        
         poisoned_docs_retrieved = [
             doc for doc in retrieved_docs
             if doc.metadata.get("is_poison", False) is True
         ]
-
+        
         target_poisoned_docs_retrieved = [
             doc for doc in poisoned_docs_retrieved
             if doc.metadata.get("id") in target_poison_ids
         ]
-        print("Count total poison: ", len(poisoned_docs_retrieved),
-              "\tCount target poison: ", len(target_poisoned_docs_retrieved))
-
+        print("Total poisoned: ", len(poisoned_docs_retrieved), "\tTarget poisoned: ", len(target_poisoned_docs_retrieved))
         has_poisoned = len(target_poisoned_docs_retrieved) > 0
         matched_target_poison_ids = [
             doc.metadata.get("id") for doc in target_poisoned_docs_retrieved
         ]
-    print("done")
-
-
-"""
+    
         retrieved_docs_text = [doc.page_content for doc in retrieved_docs]
         context = "\nExtracted documents:\n"
         context += "".join(
@@ -415,4 +429,4 @@ def run_retrieval_filtering_poisoning_evaluation(
 
     print(f"Processed {len(results)} queries")
     return results
-  """
+  
