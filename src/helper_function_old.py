@@ -84,7 +84,7 @@ def load_knowledge_base(
     device = _get_device()
     embedding_model = HuggingFaceEmbeddings(
         model_name=embedding_model_name,
-        multi_process=False,
+        multi_process=True,
         model_kwargs={"device": device},
         encode_kwargs={"normalize_embeddings": True},
     )
@@ -177,9 +177,6 @@ def add_json_to_knowledge_base(
     """
     Load JSON files from a file or directory and add them to a FAISS knowledge base.
 
-    IMPORTANT: If an existing `knowledge_base` is provided, we reuse its embedding function
-    (and therefore its device / normalization settings) to avoid mismatched embeddings.
-
     Args:
         path: Path to a single .json file or a directory containing .json files.
         knowledge_base: Existing FAISS vector store to add to. If None, creates a new one.
@@ -195,17 +192,11 @@ def add_json_to_knowledge_base(
     docs = _records_to_documents(records, text_key=text_key, source_key=source_key)
     docs_processed = _split_json_documents(docs, chunk_size=chunk_size, tokenizer_name=embedding_model_name)
 
-    # Reuse embedding function when appending to an existing FAISS store
-    if knowledge_base is not None and getattr(knowledge_base, "embedding_function", None) is not None:
-        embedding_model = knowledge_base.embedding_function
-    else:
-        device = _get_device()
-        embedding_model = HuggingFaceEmbeddings(
-            model_name=embedding_model_name,
-            multi_process=False,
-            model_kwargs={"device": device},
-            encode_kwargs={"normalize_embeddings": True},
-        )
+    embedding_model = HuggingFaceEmbeddings(
+        model_name=embedding_model_name,
+        multi_process=True,
+        encode_kwargs={"normalize_embeddings": True},
+    )
 
     if knowledge_base is None:
         knowledge_base = FAISS.from_documents(
@@ -216,5 +207,3 @@ def add_json_to_knowledge_base(
 
     print(f"Added {len(docs_processed)} chunks from {len(records)} records to the knowledge base.")
     return knowledge_base
-
-
