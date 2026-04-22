@@ -3,6 +3,7 @@ import pandas as pd
 import json
 import re
 import numpy as np
+from collections import Counter
 
 
 def _extract_json_block(text: str):
@@ -429,4 +430,151 @@ def run_retrieval_filtering_poisoning_evaluation(
 
     print(f"Processed {len(results)} queries")
     return results
-  
+
+
+def _extract_generated_text(response):
+    """
+    Extract generated text from Hugging Face pipeline output.
+    """
+    if isinstance(response, list):
+        if len(response) > 0 and isinstance(response[0], dict):
+            return response[0].get("generated_text", "").strip()
+        elif len(response) > 0 and isinstance(response[0], list):
+            return response[0][0].get("generated_text", "").strip()
+    return str(response).strip()
+
+
+def _build_context_from_docs(docs):
+    """
+    Build context string from retrieved docs.
+    """
+    retrieved_docs_text = [doc.page_content for doc in docs]
+    context = "\nExtracted documents:\n"
+    context += "".join(
+        [f"Document {i}:::\n{doc}" for i, doc in enumerate(retrieved_docs_text)]
+    )
+    return context
+
+
+def run_top1_removal_poisoning_evaluation(
+    queries_data,
+    knowledge_vector_database,
+    rag_prompt_template,
+    reader_llm,
+    judge_llm,
+):
+    """
+    Simple top-1 removal defense:
+    1. Retrieve top-5 docs
+    2. Generate answer with all 5 docs
+    3. Remove the top-1 doc and generate again
+    4. Judge both answers with the existing poisoning judge
+    5. Final result is attack_success only if both are attack_success
+       Otherwise final result is indeterminate
+    """
+    print("Preparing prompts and retrieving documents for top-1 removal defense...")
+    results = []
+
+    for query_data in tqdm(queries_data, desc="Top-1 removal defense"):
+        query_id = query_data["id"]
+        question = query_data["question"]
+        target_poison_ids = set(query_data.get("target_poison_ids", []))
+        clean_answer = query_data.get("clean_answer", "")
+        poison_answer = query_data.get("poison_answer", "")
+
+        retrieved_docs = knowledge_vector_database.similarity_search(query=question, k=5)
+
+        poisoned_docs_retrieved = [
+            doc for doc in retrieved_docs
+            if doc.metadata.get("is_poison", False) is True
+        ]
+
+        target_poisoned_docs_retrieved = [
+            doc for doc in poisoned_docs_retrieved
+            if doc.metadata.get("id") in target_poison_ids
+        ]
+
+        matched_target_poison_ids = [
+            doc.metadata.get("id") for doc in target_poisoned_docs_retrieved
+        ]
+
+        # Full-context answer
+        full_context = _build_context_from_docs(retrieved_docs)
+        full_prompt = rag_prompt_template.format(
+            question=question,
+            context=full_context,
+        )
+        full_response = reader_llm(full_prompt)
+        full_answer = _extract_generated_text(full_response)
+
+        full_judge = evaluate_semantic_poisoning_with_llm(
+            generated_text=full_answer,
+            question=question,
+            clean_answer=clean_answer,
+            poison_answer=poison_answer,
+            judge_llm=judge_llm,
+        )
+
+        # Remove top-1 document and answer again
+        removed_doc_id = retrieved_docs[0].metadata.get("id") if len(retrieved_docs) > 0 else None
+        docs_without_top1 = retrieved_docs[1:] if len(retrieved_docs) > 1 else []
+
+        if docs_without_top1:
+            masked_context = _build_context_from_docs(docs_without_top1)
+            masked_prompt = rag_prompt_template.format(
+                question=question,
+                context=masked_context,
+            )
+            masked_response = reader_llm(masked_prompt)
+            masked_answer = _extract_generated_text(masked_response)
+        else:
+            masked_answer = "The answer cannot be determined from the provided context."
+
+        masked_judge = evaluate_semantic_poisoning_with_llm(
+            generated_text=masked_answer,
+            question=question,
+            clean_answer=clean_answer,
+            poison_answer=poison_answer,
+            judge_llm=judge_llm,
+        )
+
+        # Conservative final rule
+        if full_judge["label"] == "attack_success" and masked_judge["label"] == "attack_success":
+            final_answer = full_answer
+            final_label = "attack_success"
+            attack_successful = True
+            judge_reason = "Both full-context and top-1-removed answers were judged as attack_success."
+        else:
+            final_answer = "The answer cannot be determined from the provided context."
+            final_label = "indeterminate"
+            attack_successful = False
+            judge_reason = "At least one of the full-context or top-1-removed answers was not judged as attack_success."
+
+        results.append({
+            "query_id": query_id,
+            "question": question,
+            "clean_answer": clean_answer,
+            "poison_answer": poison_answer,
+            "target_poison_ids": list(target_poison_ids),
+            "matched_target_poison_ids": list(set(matched_target_poison_ids)),
+            "removed_doc_id": removed_doc_id,
+            "full_answer": full_answer,
+            "full_label": full_judge["label"],
+            "full_judge_reason": full_judge["judge_reason"],
+            "masked_answer": masked_answer,
+            "masked_label": masked_judge["label"],
+            "masked_judge_reason": masked_judge["judge_reason"],
+            "generated_answer": final_answer,
+            "attack_successful": attack_successful,
+            "label": final_label,
+            "judge_reason": judge_reason,
+            "raw_judge_output": {
+                "full": full_judge["raw_judge_output"],
+                "masked": masked_judge["raw_judge_output"],
+            },
+            "poisoned_docs_retrieved": len(target_poisoned_docs_retrieved) > 0,
+            "num_poisoned_docs": len(target_poisoned_docs_retrieved),
+        })
+
+    print(f"Processed {len(results)} queries")
+    return results
