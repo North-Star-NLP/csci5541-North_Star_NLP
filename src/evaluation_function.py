@@ -3,7 +3,9 @@ import pandas as pd
 import json
 import re
 import numpy as np
-from collections import Counter
+import pacmap
+import plotly.express as pxfrom 
+collections import Counter
 
 
 def _extract_json_block(text: str):
@@ -312,7 +314,11 @@ def run_retrieval_filtering_poisoning_evaluation(
     """
     print("Preparing prompts and retrieving documents...")
     prompt_data = []
-
+    
+    embedding_projector = pacmap.PaCMAP(
+        n_components=2, n_neighbors=None, MN_ratio=0.5, FP_ratio=2.0, random_state=1
+    )
+    
     for query_data in tqdm(queries_data, desc="Retrieving documents"):
         query_id = query_data["id"]
         question = query_data["question"]
@@ -327,13 +333,66 @@ def run_retrieval_filtering_poisoning_evaluation(
         )
         
         indices = I[0]
+        pre_filter_docs =  retrieved_docs = [
+            knowledge_vector_database.docstore.search(
+                knowledge_vector_database.index_to_docstore_id[i]
+            )
+            for i in indices
+        ]
         
         vectors = np.array([knowledge_vector_database.index.reconstruct(int(i)) for i in indices])
-        
+        print(len(vectors))
         centroid = np.mean(vectors, axis=0)
         
         distances = np.linalg.norm(vectors - centroid, axis=1)
+
+        documents_projected = embedding_projector.fit_transform(
+            np.array(vectors + [query_embedding]), init="pca"
+        )
+        df = pd.DataFrame.from_dict(
+            [
+                {
+                    "x": documents_projected[i, 0],
+                    "y": documents_projected[i, 1],
+                    "source": "Poisoned Doc" if pre_filter_docs[i].metadata.get("is_poison",False) and pre_filter_docs[i].metadata.get("id") in target_poison_ids else  "Clean Doc",
+                    "symbol": "circle",
+                    "size_col": 4,
+                }
+                for i in range(len(pre_filter_docs))
+            ]+
+           [ {
+                       "x": documents_projected[-1, 0],
+                    "y": documents_projected[-1, 1],
+                "source": "Query",
+                "symbol":  "diamond",
+                "size_col": 4,
+            }]
+        )
         
+        # Visualize the embedding
+        fig = px.scatter(
+            df,
+            x="x",
+            y="y",
+            color="source",
+            size="size_col",
+            symbol="symbol",
+            color_discrete_map={"Query": "black"},
+            width=1000,
+            height=700,
+        )
+        fig.update_traces(
+            marker=dict(opacity=1, line=dict(width=0, color="DarkSlateGrey")),
+            selector=dict(mode="markers"),
+        )
+        fig.update_layout(
+            legend_title_text="<b>Chunk source</b>",
+            title="<b>2D Projection of Chunk Embeddings via PaCMAP</b>",
+        )
+        fig.show()
+        for doc in documents_projected:
+            print(doc)
+            
         top5_idx = np.argsort(distances)[:5]
         final_indices = indices[top5_idx]
         
@@ -365,7 +424,7 @@ def run_retrieval_filtering_poisoning_evaluation(
             [f"Document {i}:::\n{doc}" for i,
                 doc in enumerate(retrieved_docs_text)]
         )
-
+"""
         final_prompt = rag_prompt_template.format(
             question=question,
             context=context,
@@ -430,7 +489,7 @@ def run_retrieval_filtering_poisoning_evaluation(
 
     print(f"Processed {len(results)} queries")
     return results
-
+"""  
 
 def _extract_generated_text(response):
     """
