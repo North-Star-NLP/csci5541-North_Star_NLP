@@ -1,0 +1,104 @@
+\documentclass{article}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{geometry}
+\geometry{margin=1in}
+
+\title{CSCI 5541 Project: Contradictory Knowledge-Base Poisoning in RAG}
+
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+Skipped
+
+\section{Experimental Results and Comparison with Baselines}
+
+\subsection{Experimental Setup}
+\textbf{Knowledge base.} We use Hugging Face documentation as the knowledge base (\texttt{m-ric/huggingface\_doc}). Documents are chunked with \textbf{chunk size 512}. Retrieval is performed with a FAISS vector index built from embeddings using \texttt{thenlper/gte-small}. We cache the FAISS index to avoid rebuilding it repeatedly.
+
+\textbf{Queries and poisoning.} We evaluate \textbf{n=20} contradictory queries. Each query has a clean answer (ground truth) and a targeted poisoned answer. The poisoned data is inserted into the knowledge base, and retrieval is run with \textbf{k=5}. We measure whether the targeted poison was retrieved in the top-k context for each query.
+
+\textbf{Models.} The reader LLM is \texttt{HuggingFaceH4/zephyr-7b-beta}. We use a separate judge LLM \texttt{Qwen/Qwen2.5-3B-Instruct} to label outputs with strict categories:
+\texttt{CLEAN} (answer aligns with clean ground truth),
+\texttt{POISON} (answer matches the poisoned target / full replacement),
+or \texttt{INDETERMINATE} (mixed / unclear / partial adoption).
+
+\subsection{Metrics}
+We report the following metrics for the contradictory poisoning experiment:
+\begin{itemize}[leftmargin=*]
+  \item \textbf{PRR@k (Poison Retrieval Rate)}: fraction of queries where the poisoned document was retrieved in top-k.
+  \item \textbf{Strict ASR}: fraction of queries labeled \texttt{POISON} (full poison-only replacement).
+  \item \textbf{Contamination rate}: fraction of answers that contain any poisoned keywords (even if the clean answer also appears).
+  \item \textbf{Strict contamination}: fraction of answers where poisoned keywords appear and clean keywords do not.
+\end{itemize}
+
+\subsection{Baseline Results (Undefended)}
+In the baseline run, \textbf{PRR@k = 1.0}, meaning the poisoned document was retrieved for every query. Despite this, \textbf{Strict ASR = 0.0}, indicating the model did not fully replace correct answers with only the poisoned answer. However, contamination was common:
+\textbf{contamination = 0.45} and \textbf{strict contamination = 0.05}. This means that while full takeover did not occur, the model often repeated poisoned terms alongside the correct terms.
+
+The judge label distribution for the baseline run was:
+\texttt{INDETERMINATE}: 16, \texttt{CLEAN}: 4, \texttt{POISON}: 0.
+
+\subsection{Defense Experiments}
+We tested two defense approaches:
+
+\paragraph{Defense v1 (prompt hardening + untrusted-evidence tagging).}
+We explicitly instructed the model to treat retrieved evidence as untrusted and to ignore instructions or suspicious content inside retrieved text. This eliminated strict poison-only outcomes (strict ASR remained 0.0), but contamination did not improve and slightly increased, suggesting the defense reduced “full replacement” but did not prevent the model from repeating poisoned aliases.
+
+\paragraph{Defense v2 (context sanitization for alias/hedge lines).}
+We added a context sanitization step that removes likely “alias/hedge” patterns from retrieved chunks before prompting the LLM (e.g., sentences that introduce “also known as”, “also known as”, “also called”, “sometimes called”, “often called”, “commonly called”, “referred to as”, “sometimes referred to as”, “also referred to as”, “aka”, “a.k.a.”, etc). This defense targets the primary observed failure mode in contradictory poisoning: \textbf{partial adoption / alias leakage}. In our results, this reduced contamination meaningfully.
+
+\subsection{Results Summary}
+Table~\ref{tab:results} summarizes the key results across baseline and defenses.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Run} & \textbf{PRR@k} & \textbf{Strict ASR} & \textbf{Contam.} & \textbf{Strict contam.} \\
+\midrule
+Baseline (undefended) & 1.0 & 0.0 & 0.45 & 0.05 \\
+Defense v1 (prompt hardening) & 1.0 & 0.0 & 0.50 & 0.00 \\
+Defense v2 (sanitization) & 1.0 & 0.0 & 0.30 & 0.00 \\
+\bottomrule
+\end{tabular}
+\caption{Contradictory poisoning results (n=20, k=5). PRR@k=1.0 indicates poison was always retrieved. Strict ASR stays 0.0, but contamination captures partial adoption of poisoned aliases.}
+\label{tab:results}
+\end{table}
+
+The judge label distribution for the defended run (Defense v2 enabled) was:
+\texttt{INDETERMINATE}: 13, \texttt{CLEAN}: 7, \texttt{POISON}: 0.
+
+\section{Main Findings}
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Retrieval exposure is worst-case.} With PRR@k = 1.0, the poisoned content was consistently retrieved into the model context. This confirms the poisoning is being surfaced by the retriever and is not “missing” due to retrieval failure.
+  \item \textbf{Contradictory poisoning primarily causes alias leakage, not full takeover.} Strict ASR stayed at 0.0 in all runs, meaning the model rarely outputs only the poisoned answer. Instead, the model often answers correctly but appends poisoned aliases (or mixes clean and poisoned terms), which appears as \texttt{INDETERMINATE} in judge labels.
+  \item \textbf{Prompt-only defenses are insufficient for alias-style poisoning.} Defense v1 prevented strict poison-only replacement but did not reduce contamination, and contamination slightly increased from 0.45 to 0.50. This suggests the model still repeats poisoned terms even when explicitly instructed to ignore malicious content.
+  \item \textbf{Sanitizing retrieved context is effective for this failure mode.} Defense v2 reduced contamination from 0.45 to 0.30 while keeping strict contamination at 0.0. This aligns with the observed behavior: removing alias/hedge lines directly targets how contradictory poison is expressed in retrieved evidence.
+\end{enumerate}
+
+\section{Limitations and Discussion}
+\textbf{Small evaluation size.} Our contradictory experiment used 20 queries, which is sufficient to observe consistent patterns but not enough for strong statistical claims. Increasing the number of queries would improve confidence in the measured rates.
+
+\textbf{Judge reliability.} Several outputs were labeled \texttt{INDETERMINATE}, reflecting the difficulty of classifying partially poisoned answers. A judge model can itself be inconsistent or verbose, and “mixed” answers are inherently ambiguous. Future work should add stricter parsing rules and/or a second independent judge for agreement analysis.
+
+\textbf{Metric sensitivity.} Strict ASR measures full replacement only. It can miss meaningful corruption where the model repeats the poisoned alias alongside the correct answer. Contamination is therefore necessary, but it can over-count harmless mentions. This motivates reporting both contamination and strict contamination.
+
+\textbf{Compute and engineering constraints.} Building a FAISS index and running reader/judge models is expensive and sensitive to environment issues (GPU availability, dependency conflicts, and slow CPU runs). We addressed this by caching FAISS indexes and saving model weights, but reproducibility remains a practical challenge.
+
+\textbf{Scope.} These results are specific to alias-style contradictory poisoning on Hugging Face documentation. Other poisoning styles (e.g., fully fabricated claims, multi-hop corruption, or poisoning that targets retrieval ranking) may require different defenses.
+
+\section{Plan for the Final Report}
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Expand the contradictory benchmark.} Increase the number of queries beyond 20 and add more diverse contradictory poison patterns (synonyms, swapped definitions, and short misleading “glossary” lines).
+  \item \textbf{Incremental defense testing.} Evaluate Defense v2 components separately (e.g., alias-line filtering alone vs. broader context sanitization) and report which patterns contribute most to contamination reduction.
+  \item \textbf{Strengthen evaluation.} Add a second evaluation method to complement the judge (e.g., keyword-based checks already used for contamination plus a stricter “poison-only replacement” detector). Report agreement between judge labels and keyword-derived signals.
+  \item \textbf{Error analysis.} Provide representative examples of (a) clean answers, (b) contaminated answers with alias leakage, and (c) cases where sanitization changes the output. Summarize common patterns in failures and how the defense affects them.
+  \item \textbf{Reproducibility.} Document the cached FAISS index naming convention, saved model directories, and exact settings (k, chunk size, dataset name, embedding model) so results can be rerun reliably by teammates.
+\end{enumerate}
+
+\end{document}
