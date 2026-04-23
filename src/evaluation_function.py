@@ -3,8 +3,10 @@ import pandas as pd
 import json
 import re
 import numpy as np
+import os
 from collections import Counter
-
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
 
 def _extract_json_block(text: str):
     """
@@ -312,7 +314,12 @@ def run_retrieval_filtering_poisoning_evaluation(
     """
     print("Preparing prompts and retrieving documents...")
     prompt_data = []
-
+    n = knowledge_vector_database.index.ntotal  # number of vectors
+    d = knowledge_vector_database.index.d       # dimension
+    
+    all_vectors = np.zeros((n, d), dtype='float32')
+    all_vectors = knowledge_vector_database.index.reconstruct_n(0, n)
+    query_count = 0
     for query_data in tqdm(queries_data, desc="Retrieving documents"):
         query_id = query_data["id"]
         question = query_data["question"]
@@ -321,22 +328,79 @@ def run_retrieval_filtering_poisoning_evaluation(
         poison_answer = query_data.get("poison_answer", "")
   
         query_embedding = knowledge_vector_database.embedding_function.embed_query(question)
-        
         D, I = knowledge_vector_database.index.search(
             np.array([query_embedding]), k=10
         )
         
         indices = I[0]
+        pre_filter_docs =  retrieved_docs = [
+            knowledge_vector_database.docstore.search(
+                knowledge_vector_database.index_to_docstore_id[i]
+            )
+            for i in indices
+        ]
         
         vectors = np.array([knowledge_vector_database.index.reconstruct(int(i)) for i in indices])
-        
+
         centroid = np.mean(vectors, axis=0)
         
         distances = np.linalg.norm(vectors - centroid, axis=1)
-        
+
         top5_idx = np.argsort(distances)[:5]
-        final_indices = indices[top5_idx]
         
+        final_indices = indices[top5_idx]
+        kept_vectors = np.array([knowledge_vector_database.index.reconstruct(int(i)) for i in final_indices])\
+        
+        poison_vectors = np.array([
+            knowledge_vector_database.index.reconstruct(int(indices[i]))
+            for i in range(len(pre_filter_docs))
+            if pre_filter_docs[i].metadata.get("is_poison", False)
+            and pre_filter_docs[i].metadata.get("id") in target_poison_ids
+        ])
+        
+        combined = np.vstack([
+            all_vectors,
+            vectors,
+            kept_vectors,
+            poison_vectors,
+            np.array(query_embedding).reshape(1, -1)
+        ])
+        
+        pca = PCA(n_components=2)
+        proj = pca.fit_transform(combined)
+    
+        i = 0
+        all_2d = proj[i:i+len(all_vectors)]; i += len(all_vectors)
+        retrieved_2d = proj[i:i+10]; i += 10
+        kept_2d = proj[i:i+5]; i += 5
+        poison_2d = proj[i:i+len(poison_vectors)]; i+= len(poison_vectors)
+        query_2d = proj[i]
+        
+        centroid = kept_vectors.mean(axis=0)
+        centroid_2d = pca.transform(centroid.reshape(1, -1))
+        
+        # Plot
+        plt.figure(figsize=(8,6))
+        plt.scatter(all_2d[:,0], all_2d[:,1], alpha=0.1, label="All Docs")
+        plt.scatter(retrieved_2d[:,0], retrieved_2d[:,1], s=100, label="Top 10 Retrieved")
+        plt.scatter(kept_2d[:,0], kept_2d[:,1], s=100, label="Kept (Final 5)")
+        plt.scatter(poison_2d[:,0], poison_2d[:,1], marker="x", label="Poison Doc")
+        plt.scatter(query_2d[0], query_2d[1], marker="^", s=150, label="Query")
+        plt.scatter(centroid_2d[:,0], centroid_2d[:,1], marker="*", s=200, label="Centroid")
+        
+        plt.legend()
+        plt.title("Retrieval Filtering via Centroid Distance")
+      
+        output_dir = 'plots/retrieval_filtering'
+        filename = f'retrieval_plot_{query_count}.png'
+        query_count += 1
+        os.makedirs(output_dir, exist_ok=True)
+
+        plt.savefig(os.path.join(output_dir, filename))
+        plt.show()
+        plt.close()
+                    
+       
         retrieved_docs = [
             knowledge_vector_database.docstore.search(
                 knowledge_vector_database.index_to_docstore_id[i]
@@ -365,7 +429,6 @@ def run_retrieval_filtering_poisoning_evaluation(
             [f"Document {i}:::\n{doc}" for i,
                 doc in enumerate(retrieved_docs_text)]
         )
-
         final_prompt = rag_prompt_template.format(
             question=question,
             context=context,
