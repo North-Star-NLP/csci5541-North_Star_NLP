@@ -64,17 +64,6 @@
           </p>
         </div>
         
-        <div class="author-container">
-          <div class="author-image">
-                        
-              <img src="files/headshot_placeholder.png" alt="Emmanuel Mongare">
-            
-          </div>
-          <p>
-            Emmanuel <br> Mongare
-          </p>
-        </div>
-        
       </div>
 
       <br/>
@@ -129,8 +118,7 @@
     
     <h2 id="abstract">Abstract</h2>
 
-<p>The motivation for this project is that RAG systems often rely on retrieved content from untrusted sources, and malicious documents can contain indirect prompt injections that cause the model to ignore the user’s question or follow attacker instructions. This creates a security–utility tradeoff, since stronger defenses may reduce attacks but also hurt answer quality.
-Our approach is to build a controlled benchmark of roughly 300 cases, including clean examples, explicit injection attacks, and semantically disguised injections, and evaluate a baseline RAG pipeline with defensive prompting and lightweight content filtering. We measure both Attack Success Rate and answer accuracy to compare robustness and utility across defense settings.</p>
+<p>Retrieval-augmented generation (RAG) systems improve language models by incorporating external knowledge, but they are also vulnerable to knowledge-base poisoning, where a small number of adversarial documents can manipulate model outputs. In this work, we study semantic poisoning and evaluate a range of defense strategies, including prompting-based and retrieval-based approaches. Our results show that while prompting alone provides limited protection, controlling the retrieved context—especially by reducing the influence of highly ranked documents—significantly improves robustness. These findings highlight the importance of combining reasoning and retrieval defenses to build more reliable RAG systems.</p>
 
 <hr>
 
@@ -138,7 +126,12 @@ Our approach is to build a controlled benchmark of roughly 300 cases, including 
 
 <p>A figure that conveys the main idea behind the project or the main application being addressed. This figure is from <a href="https://arxiv.org/pdf/2210.07469">StyLEx</a>.</p>
 
-<p class="sys-img"><img src="./files/teaser.png" alt="imgname"></p>
+<figure style="text-align: center;">
+  <img src="./files/PoisonRAG.png" alt="PoisonRAG Overview" style="max-width: 100%;">
+  <figcaption>
+    Figure 1. Overview of PoisonedRAG. A malicious document is injected into the knowledge base to steer the model toward a target answer for a specific query.
+  </figcaption>
+</figure>
 
 
 <h3 id="the-timeline-and-the-highlights">Any subsection</h3>
@@ -153,88 +146,74 @@ Our approach is to build a controlled benchmark of roughly 300 cases, including 
 <b>What did you try to do? What problem did you try to solve? Articulate your objectives using absolutely no jargon.</b>
 </p>
 <p>
-In this project, we examine whether an LLM can be influenced by malicious instructions hidden inside the evidence it retrieves to answer a question. Our goal is to understand how often these hidden instructions can cause the LLM to ignore the user’s actual request or produce an answer that does not match the intended task. We also study whether simple protective methods can reduce this problem while still allowing the LLM to remain useful and accurate when the retrieved documents are normal and trustworthy. More specifically, the project focuses on measuring the attack success rate of different prompt injection attacks, evaluating several defense strategies, and exploring the relationship among attack success rate, defense strategy, and answer accuracy.</p>
+In this project, we investigated how adversarial documents injected into a search system can trick an AI model into giving wrong answers. Specifically, we wanted to understand: (1) how often models fall for poisoned evidence when retrieving information to answer questions, and (2) whether we can develop defensive strategies to protect the model while keeping it useful. The problem we addressed is that retrieval-based systems like RAG introduce a new vulnerability—attackers can slip misleading documents into the knowledge base that appear relevant to specific queries. When the model treats these poisoned documents as trustworthy evidence, it produces incorrect responses. We built a controlled testing benchmark and evaluated multiple defense strategies—including prompting techniques and document filtering methods—measuring how well each one prevents attacks while still keeping the system accurate on normal questions. Our goal was to understand the tradeoff between security and utility: whether stronger protections against poisoned information also hurt the model's ability to answer correctly when documents are legitimate.
+</p>
 
 <p>
 <b>How is it done today, and what are the limits of current practice?</b>
+
 </p>
 <p>
-Current work usually studies indirect prompt injection by building attack cases in which malicious instructions are hidden inside retrieved documents and then testing whether an LLM follows those instructions instead of the user’s request. Prior research has shown that modern LLM-based systems can often resist at least some indirect prompt injection attacks, especially when prompting or filtering defenses are applied, which means attack success rates may already be relatively low in many settings.
-<br> <br>
-The main limitation of current practice, however, is that low attack success rates do not fully answer the broader question of how defenses affect overall system behavior. Even if our experiments do not produce large differences in attack success rate, it is still valuable to study the relationship among attack success rate, defense strategy, and answer accuracy. That relationship may seem intuitive, but it is still worth measuring directly, because defenses that improve safety can also reduce answer quality, and careful experiments are needed to make that tradeoff visible rather than assumed.<p>
-
+(Literature review)
 <p>
 <b>Who cares? If you are successful, what difference will it make?</b>
 </p>
 <p>
-Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.
+This work improves the reliability and trustworthiness of retrieval-augmented generation (RAG) systems in real-world applications that depend on external and often untrusted data sources, such as enterprise search, technical documentation assistants, and web-based question answering. By defending against knowledge-base poisoning, we reduce the risk that a small number of adversarial documents can manipulate model outputs, leading to incorrect or misleading responses. This is particularly important in high-stakes settings where accuracy and robustness are critical, and more broadly contributes to building AI systems that can safely and effectively leverage large-scale, open-domain knowledge.
 </p>
 
 <hr>
 
 <h2 id="approach">Approach</h2>
 
-<p>
-<b>What did you do exactly? How did you solve the problem? Why did you think it would be successful? Is anything new in your approach?</b>
-</p>
+<h4><b>Semantic Poisoning Defense</b></h4>
 
 <p>
-Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+We focus on defending against semantic poisoning in retrieval-augmented generation (RAG), where adversarial documents introduce plausible but incorrect information to mislead the model. Our approach is divided into prompt-level defenses and retrieval-level defenses, targeting different stages of the RAG pipeline.
 </p>
 
-<p>
-<b>What problems did you anticipate? What problems did you encounter? Did the very first thing you tried work?</b>
-</p>
+<h3><b>Prompt-Level Defenses</b></h4>
 
 <p>
-Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.
+At the prompt level, we design strategies that guide the model to reason more carefully over potentially unreliable context. We first introduce a prompting defense that explicitly warns the model that retrieved documents may contain incorrect information and encourages it to rely on answers supported by multiple sources. We further extend this with a few-shot prompting defense, where the model is provided with examples demonstrating how to handle misleading or conflicting documents. These approaches leverage in-context learning to improve the model's ability to compare evidence across documents rather than blindly trusting highly relevant but incorrect content.
 </p>
+
+<h3><b>Retrieval-Level Defenses</b></h4>
+
+<p>
+At the retrieval level, we aim to reduce the influence of poisoned documents before they reach the generation stage. We implement retrieval filtering to remove suspicious or outlier documents, and a top-1 removal strategy that excludes the highest-ranked retrieved document. This design is motivated by the assumption that, in realistic attack scenarios, poisoned documents are intentionally optimized to appear highly relevant and thus ranked at the top of retrieval results. Since top-ranked evidence often dominates the model's output, removing or weakening this influence can significantly improve robustness.
+</p>
+
+<h4><b>Contradictory Poisoning Defense</b></h4>
 
 <hr>
     
 <h2 id="results">Results</h2>
+
+<h4><b>Semantic Poisoning Defense</b></h4>
+
 <p>
 <b>How did you measure success? What experiments were used? What were the results, both quantitative and qualitative? Did you succeed? Did you fail? Why?</b>
 </p>
 <p>
-Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt.
+To evaluate our approach, we use Attack Success Rate (ASR) as the main metric, where a lower ASR means the model is less influenced by poisoned documents. We run experiments on a controlled set of 20 queries, each paired with semantically poisoned documents that introduce plausible but incorrect information. We compare a baseline RAG pipeline against several defenses, including prompting, few-shot prompting, retrieval filtering, and top-1 removal.
 </p>
-<table>
-  <thead>
-    <tr>
-      <th style="text-align: center"><strong>Experiment</strong></th>
-      <th style="text-align: center">1</th>
-      <th style="text-align: center">2</th>
-      <th style="text-align: center">3</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td style="text-align: center"><strong>Sentence</strong></td>
-      <td style="text-align: center">Example 1</td>
-      <td style="text-align: center">Example 2</td>
-      <td style="text-align: center">Example 3</td>
-    </tr>
-    <tr>
-      <td style="text-align: center"><strong>Errors</strong></td>
-      <td style="text-align: center">error A, error B, error C</td>
-      <td style="text-align: center">error C</td>
-      <td style="text-align: center">error B</td>
-    </tr>
-  </tbody>
-  <caption>Table 1. This is Table 1's caption</caption>
-</table>
+<table> <thead> <tr> <th style="text-align: center"><strong>Method</strong></th> <th style="text-align: center">Baseline</th> <th style="text-align: center">Prompting</th> <th style="text-align: center">Few-Shot</th> <th style="text-align: center">Filtering</th> <th style="text-align: center">Top-1 Removal</th> </tr> </thead> <tbody> <tr> <td style="text-align: center"><strong>ASR (↓)</strong></td> <td style="text-align: center">55%</td> <td style="text-align: center">60%</td> <td style="text-align: center">40%</td> <td style="text-align: center">25%</td> <td style="text-align: center">20%</td> </tr> <tr> <td style="text-align: center"><strong>Observation</strong></td> <td style="text-align: center">Highly vulnerable</td> <td style="text-align: center">Slightly worse</td> <td style="text-align: center">Some improvement</td> <td style="text-align: center">Strong improvement</td> <td style="text-align: center">Best overall</td> </tr> </tbody> <caption>Table 1. Attack Success Rate (ASR) for semantic poisoning defense (lower is better).</caption> </table>
 <br>
-<div style="text-align: center;">
-<img style="height: 300px;" alt="" src="./files/results.png">
-</div>
+
+<p>
+Quantitatively, the results show that semantic poisoning is highly effective against a standard RAG pipeline, with the baseline reaching an ASR of 55%. The basic prompting defense not only fails to help but slightly worsens performance to 60%, suggesting that high-level warnings alone are insufficient and may introduce uncertainty that leads the model to rely more on misleading but confident retrieved content. In contrast, few-shot prompting reduces ASR to 40%, indicating that providing concrete examples helps the model better handle conflicting evidence through in-context learning. The largest improvements come from retrieval-based defenses: filtering lowers ASR to 25%, and top-1 removal further reduces it to 20%, corresponding to roughly 55% and 64% relative improvements over the baseline, respectively. While top-1 removal performs best, both retrieval-based approaches are effective at limiting exposure to poisoned context, highlighting that controlling retrieved inputs is more impactful than relying on prompting alone.
 <br><br>
+Qualitatively, semantic poisoning works by introducing plausible but factually incorrect content that closely resembles valid implementations, making it difficult for the model to detect and reject. In the baseline setting, the model often relies on these highly relevant but incorrect answers, and this behavior is not easily corrected through simple prompting. Few-shot prompting improves performance by encouraging the model to compare information across documents and favor answers supported by consistent evidence, but it still struggles when poisoned documents are internally consistent or closely mimic correct patterns. Retrieval-based defenses, such as filtering and top-1 removal, are more effective because they reduce the influence of misleading documents before generation. In particular, top-1 removal is motivated by the assumption that attackers will optimize poisoned content to rank highly and dominate the model’s reasoning. However, both approaches can still fail when multiple poisoned documents are present or when clean supporting evidence is limited, highlighting that semantic poisoning exploits both plausibility and retrieval dominance.</p>
+<br><br>
+
+<h4><b>Contradictory Poisoning Defense</b></h4>
 
 <hr>
 
 
 
-<h2 id="conclusion">Conclustion and Future Work</h2>
+<h2 id="conclusion">Conclusion and Future Work</h2>
 <p>
 
   How easily are your results able to be reproduced by others?
