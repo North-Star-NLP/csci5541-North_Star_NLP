@@ -153,9 +153,33 @@ In this project, we investigated how adversarial documents injected into a searc
 <b>How is it done today, and what are the limits of current practice?</b>
 
 </p>
-<p>
-(Literature review)
-<p>
+
+<h2>Literature Review</h2>
+<h3>PoisonRag</h3>
+<p>In \textit{PoisonedRAG: Knowledge Corruption Attacks to Retrieval-Augmented Generation of Large Language Models}, the authors identify the knowledge base as a critical attack surface. 
+  They propose a method for crafting malicious documents that, when inserted into the corpus, can steer model outputs. 
+  They describe a successful attack as having two requirements: retrieval and generation. 
+  A set of target queries is chosen, this represents the questions that an attacker wishes to divert the answer for. 
+  The poisoned document must satisfy a retrieval condition for the given query by being selected among the top k documents returned by the retriever. 
+  Because retrievers rank documents using embedding similarity, the malicious text must appear highly relevant to the user’s question.  
+  In black-box settings, they rely on the target question itself to help satisfy retrieval, while in white-box settings they further optimize the malicious text using knowledge of the retriever’s similarity function. 
+  The document must also satisfy a generation condition, meaning that once retrieved, it is likely to push the model toward an attacker-chosen answer. 
+  To meet this second requirement, the authors use LLMs to generate persuasive malicious content, noting limitations in gradient-descent-based approaches. 
+  Their experiments show that this attack remains highly effective even in large-scale knowledge bases with more than 2 million documents, requiring only 5 poisoned texts per target question.</p>
+
+<h3>PR-Attack</h3>
+<p>PR-Attack: Coordinated Prompt-RAG Attacks on Retrieval-Augmented Generation in Large Language Models via Bilevel Optimization} extends the work from PoisonRag by studying an attacker who can both alter the user-facing prompt and introduce a single poisoned document into the knowledge base. 
+  This setting is motivated by scenarios such as Prompt-as-a-Service systems, where an intermediary may be able to modify prompts before they reach the model. 
+  The goal is to make the attack more stealthy by causing malicious behavior only during specific ``sensitive periods,'' rather than across all queries. 
+  To achieve this, the authors tune their poison documents to only be retrieved when a trigger token is included in the query. 
+  Their results show that with only one malicious edit to the knowledge base, the coordinated attack can reliably induce the target response when the trigger condition is present.</p>
+
+<h3>Hidden-in-Plain-Text</h3>
+<p>Hidden-in-Plain-Text: A Benchmark for Social-Web Indirect Prompt Injection in RAG} introduces OpenRAG-Soc, a benchmark designed to study indirect prompt injection (IPI) through third-party web content \cite{Guo2026HiddeninPlainTextAB}.
+  In this setting, malicious instructions are embedded within web pages that are later retrieved and passed to the language model as context. 
+  To support systematic evaluation, the benchmark includes an end-to-end pipeline for ingestion, retrieval, and generation, along with multiple retriever choices, generator templates, baselines, and evaluation metrics. 
+  Using this framework, the authors measure how well existing defenses against prompt injection reduce attack success rate in realistic web-based RAG scenarios. The benchmark highlights that indirect attacks can be delivered through seemingly ordinary online content, making them difficult to detect through simple filtering alone.</p>
+
 <b>Who cares? If you are successful, what difference will it make?</b>
 </p>
 <p>
