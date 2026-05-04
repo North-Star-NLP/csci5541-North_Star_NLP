@@ -1,0 +1,9 @@
+label,k,PRR_at_k,Strict_ASR,Contamination,Strict_Contamination,n
+baseline_k3,3,1.0,0.0,0.55,0.0,20
+defended_v2_alias_k3,3,1.0,0.0,0.6,0.05,20
+baseline_k10,10,1.0,0.0,0.55,0.05,20
+defended_v2_alias_k10,10,1.0,0.0,0.2,0.0,20
+defended_v2_alias_k5,5,1.0,0.0,0.55,0.05,20
+defended_v2_alias_hedge_k5,5,1.0,0.0,0.5,0.05,20
+baseline_prompt_short_k5,5,1.0,0.05,0.6,0.0,20
+defended_v2_alias_prompt_short_k5,5,1.0,0.05,0.25,0.0,20
