@@ -205,7 +205,26 @@ At the prompt level, we design strategies that guide the model to reason more ca
 <h3><b>Retrieval-Level Defenses</b></h4>
 
 <p>
-At the retrieval level, we aim to reduce the influence of poisoned documents before they reach the generation stage. We implement retrieval filtering to remove suspicious or outlier documents, and a top-1 removal strategy that excludes the highest-ranked retrieved document. This design is motivated by the assumption that, in realistic attack scenarios, poisoned documents are intentionally optimized to appear highly relevant and thus ranked at the top of retrieval results. Since top-ranked evidence often dominates the model's output, removing or weakening this influence can significantly improve robustness.
+  At the retrieval level, we aim to reduce the influence of or remove poisoned documents before they reach the generation stage. 
+  We implement retrieval filtering to remove suspicious or outlier documents and a top-1 removal strategy that excludes the highest-ranked retrieved document. 
+</p>
+    
+<p>
+  Retrieval filtering attempts to keep higher quality documents from the knowledge base.  Documents with the most similar vector representations to the user query are returned by the retriever, and poison documents are tuned to have a high similarity to the query vector to encourage retrieval.
+  Because of this we cannot use the query vector as a comparison point for filtering. 
+  The method proposed uses the centroid of the <b><i>k</i></b> retrieved documents' semantic vectors and keeps the <b><i>n</i></b> documents whose vectors are most similar to the centroid vector. 
+  The intuition is the poisoned document will generally be among the most different of the retrieved documents. 
+</p>
+<figure style="text-align: center;">
+  <img src="./files/retrieval_plot.png" alt="Centorid based retrieval filtering style="max-width: 100%;">
+  <figcaption>
+    Figure 2. Dimension reduced visualization of the knowledge database vectors, the initial retrieval, and the retained documents.
+  </figcaption>
+</figure>
+
+<p>
+  Top-1 removal is motivated by the assumption that, in realistic attack scenarios, poisoned documents are intentionally optimized to appear highly relevant and thus ranked at the top of retrieval results. 
+  Since top-ranked evidence often dominates the model's output, removing or weakening this influence can significantly improve robustness.
 </p>
 
 <h4><b>Contradictory Poisoning Defense</b></h4>
