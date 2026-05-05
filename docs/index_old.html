@@ -196,30 +196,10 @@ At the prompt level, we design strategies that guide the model to reason more ca
   Since top-ranked evidence often dominates the model's output, removing or weakening this influence can significantly improve robustness.
 </p>
 
-<br>
-<hr>
 <h4><b>Contradictory Poisoning Defense</b></h4>
 
-<p>
-Contradictory poisoning is different from semantic poisoning. Instead of forcing a fully wrong answer, it often causes <b>alias leakage</b>. The model answers correctly but also repeats a poisoned alias in the same sentence (for example: “X … also known as Y”). This creates <b>mixed answers</b> that are not a full takeover but are still a real form of corruption.
-</p>
-
-<p>
-We tested two defenses for contradictory poisoning:
-</p>
-
-<h3><b>1. Prompt Hardening (v1)</b></h4>
-<p>
-We instruct the model that retrieved documents may contain incorrect or misleading content. We also tell it to prefer canonical terms and avoid repeating alternative names when evidence conflicts. This defense tries to reduce copying of poisoned aliases from retrieved text.
-</p>
-
-<h3><b>2. Context Sanitization (v2)</b></h4>
-<p>
-We remove alias-style sentences from the retrieved context before generation. Concretely, we strip sentences that contain patterns like “also known as”, “also called”, and “referred to as”. We also tested a stronger version that removes hedge phrases like “in simplified explanations” because they often introduce poisoned aliases. This defense targets the main failure mode we observed: alias leakage from retrieved evidence.
-</p>
-<br>
-
 <hr>
+
 <h2 id="experimental-setup">Experimental Setup</h2>
 
 <p>
@@ -256,169 +236,19 @@ Quantitatively, the results show that semantic poisoning is highly effective aga
 Qualitatively, semantic poisoning consists of injecting plausible but factually incorrect content that is similar to valid implementations and thus difficult for the model to detect and reject. In the baseline setting, the model often relies on these highly relevant but incorrect answers, and does not learn to fix this behavior through simple prompting. Few-shot prompting improves performance by encouraging the model to compare information across documents and prefer answers with consistent evidence, but still struggles when poisoned documents are internally consistent or closely mimic correct patterns. Retrieval-based defenses, such as filtering and top-1 removal, are more effective because they reduce the influence of misleading documents before generation. In particular, top-1 removal is motivated by the assumption that attackers will optimize poisoned content to rank highly and dominate the model’s reasoning. However, both approaches can still fail when multiple poisoned documents are present or when clean supporting evidence is limited, highlighting that semantic poisoning exploits both plausibility and retrieval dominance. </p>
 <br><br>
 
-
-<hr>
 <h4><b>Contradictory Poisoning Defense</b></h4>
 
+<hr>
 
-<p>
-For contradictory poisoning, strict takeover is rare, so we report multiple metrics:
-</p>
 
-<ul>
-  <li><b>PRR</b>: poison retrieval rate (how often the target poison appears in top-k retrieval).</li>
-  <li><b>Strict ASR</b>: poison-only replacement (full takeover).</li>
-  <li><b>Contamination</b>: poison keywords appear in the answer (partial adoption / alias leakage).</li>
-  <li><b>Strict contamination</b>: poison keywords appear and clean keywords do not.</li>
-</ul>
 
-<p>
-<b>Main results (k = 5):</b> Poison was retrieved every time (PRR at k = 1.0). Strict ASR stayed at 0.0, but contamination was common in the baseline. Prompt hardening did not reduce contamination, while context sanitization reduced contamination.
-</p>
-
-<table>
-  <thead>
-    <tr>
-      <th style="text-align: center"><strong>Method</strong></th>
-      <th style="text-align: center">Baseline</th>
-      <th style="text-align: center">Prompt Hardening (v1)</th>
-      <th style="text-align: center">Context Sanitization (v2)</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td style="text-align: center"><strong>PRR</strong></td>
-      <td style="text-align: center">1.00</td>
-      <td style="text-align: center">1.00</td>
-      <td style="text-align: center">1.00</td>
-    </tr>
-    <tr>
-      <td style="text-align: center"><strong>ASR</strong></td>
-      <td style="text-align: center">0.00</td>
-      <td style="text-align: center">0.00</td>
-      <td style="text-align: center">0.00</td>
-    </tr>
-    <tr>
-      <td style="text-align: center"><strong>Contamination</strong></td>
-      <td style="text-align: center">0.45</td>
-      <td style="text-align: center">0.50</td>
-      <td style="text-align: center">0.30</td>
-    </tr>
-    <tr>
-      <td style="text-align: center"><strong>Strict Contamination</strong></td>
-      <td style="text-align: center">0.05</td>
-      <td style="text-align: center">0.00</td>
-      <td style="text-align: center">0.00</td>
-    </tr>
-  </tbody>
-  <caption>
-    Table 2. Contradictory poisoning results at k=5 (n=20). 
-  </caption>
-</table>
-
-<br>
-
-<!-- Significance check (k variation) -->
-<h3>Significance check (k variation)</h3>
-<p>
-  The effect depends on retrieval depth. At k=10, sanitization reduces contamination strongly.
-  At k=3, sanitization does not help and slightly worsens contamination. This shows that
-  contradictory defenses should be tested at more than one k value.
-</p>
-
-<table class="table">
-  <thead>
-    <tr>
-      <th style="text-align:center;">k</th>
-      <th style="text-align:center;">Baseline Contamination</th>
-      <th style="text-align:center;">Context Sanitization (alias-only) Contamination</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td style="text-align:center;">3</td>
-      <td style="text-align:center;">0.55</td>
-      <td style="text-align:center;">0.60</td>
-    </tr>
-    <tr>
-      <td style="text-align:center;">10</td>
-      <td style="text-align:center;">0.55</td>
-      <td style="text-align:center;">0.20</td>
-    </tr>
-  </tbody>
-</table>
-<p class="table-caption" style="text-align:center; margin-top:8px;">
-  Table 3. k variation (n=20). Context sanitization uses alias-only sentence removal. Lower contamination is better.
-</p>
-
-<!-- Significance check (prompting trick + sanitization variants) -->
-<h3>Significance check (prompting trick + sanitization variants)</h3>
-<p>
-  Under a short-answer prompt at k=5, sanitization still reduces contamination (0.60 -> 0.25).
-  We also compared alias-only vs alias + hedge sanitization, alias + hedge slightly improved
-  contamination (0.55 -> 0.50).
-</p>
-
-<table class="table">
-  <thead>
-    <tr>
-      <th style="text-align:center;">Method (k=5)</th>
-      <th style="text-align:center;">Contamination </th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td style="text-align:center;">Context Sanitization (alias-only)</td>
-      <td style="text-align:center;">0.55</td>
-    </tr>
-    <tr>
-      <td style="text-align:center;">Context Sanitization (alias + hedge)</td>
-      <td style="text-align:center;">0.50</td>
-    </tr>
-    <tr>
-      <td style="text-align:center;">Baseline (short-answer prompt)</td>
-      <td style="text-align:center;">0.60</td>
-    </tr>
-    <tr>
-      <td style="text-align:center;">Context Sanitization (alias-only, short-answer prompt)</td>
-      <td style="text-align:center;">0.25</td>
-    </tr>
-  </tbody>
-</table>
-<p class="table-caption" style="text-align:center; margin-top:8px;">
-  Table 4. Prompt and sanitization variants at k=5 (n=20). Lower contamination is better.
-</p>
-
-<br>
-
-<p>
-<b>Qualitative summary:</b> Contradictory poisoning often produces mixed answers. The model gives the correct term and appends a poisoned alias (alias leakage). That is why strict takeover can stay low while contamination is high. Prompt hardening does not stop alias leakage reliably. Sanitization helps because it removes the alias/hedge sentences from the retrieved text before generation.
-</p>
 <h2 id="conclusion">Conclusion and Future Work</h2>
+<p>
 
-<p><b>How easily are your results able to be reproduced by others?</b><br>
-Our results are reproducible because the pipeline is fully specified: dataset (<a href="https://huggingface.co/datasets/m-ric/huggingface_doc" target="_blank">m-ric/huggingface_doc</a>), chunk size (512), embedding model (thenlper/gte-small), retriever (FAISS), reader model (zephyr-7b-beta), and judge model (Qwen2.5-3B-Instruct). We also use deterministic decoding (temperature=0, no sampling). We save JSON outputs and summary tables, and we cache the FAISS index and models to avoid rebuild differences across machines.
-</p>
-
-<p><b>Did your dataset or annotation affect other people's choice of research or development projects to undertake?</b><br>
-Yes. We created a small but controlled benchmark: each question is paired with a clean answer, a poisoned answer, and keyword sets. This makes it easy to extend the benchmark (add new questions or poison styles) and compare new defenses in a consistent way. Separating semantic poisoning and contradictory poisoning also shows that different poisoning styles need different defenses and metrics.
-</p>
-
-<p><b>Does your work have potential harm or risk to our society? What kinds? If so, how can you address them?</b><br>
-Knowledge-base poisoning can be misused to manipulate real RAG systems such as: enterprise search, documentation assistants, etc, causing them to produce misleading information. So, there's potential and risk to the society if critical decisions are based on poisoned/compromised RAG systems. 
-However, our work was defensive. We tested attacks to understand failure modes and evaluate mitigations (retrieval defenses and context sanitization). We avoided sharing credentials and treated any detected tokens as compromised. We also avoided publishing sensitive artifacts, for example: cached indexes with secrets.
-Based on our findings, we recommend the following protections against RAG Poisoning: 1)restrict who can add/edit docs, log changes, and review new or changed sources.
-2) filter/down-rank suspicious outliers and sanitize retrieved text (remove alias/hedge patterns) before the model reads it. 3) detect repeated contamination in outputs and quickly quarantine or roll back the retrieved documents causing it.
-
-</p>
-
-<p><b>What limitations does your model have?</b><br>
-Our benchmark is small (20 queries per poisoning style) and uses one main corpus and model setup, so results may not generalize to all domains. Keyword-based contamination can miss paraphrases, and LLM judges can be inconsistent, so we pair judge labels with deterministic metrics like PRR and contamination. For contradictory poisoning, results also vary with retrieval depth (k), so defenses should be tested under multiple k values.
-</p>
-
-<p><b>How can you extend your work for future research?</b><br>
-Future work includes expanding the benchmark size, adding a clean-only utility evaluation (accuracy on a non-poisoned KB), and testing additional retrievers and reader models. For semantic poisoning, retrieval-time methods (filtering/down-ranking) look most promising. For contradictory poisoning, stronger sanitization patterns and lightweight post-processing rules that remove alias phrases from final outputs may further reduce leakage.
-</p>
+  How easily are your results able to be reproduced by others?
+  Did your dataset or annotation affect other people's choice of research or development projects to undertake?
+  Does your work have potential harm or risk to our society? What kinds? If so, how can you address them?
+  What limitations does your model have? How can you extend your work for future research?</p>
 
 
 <hr>
