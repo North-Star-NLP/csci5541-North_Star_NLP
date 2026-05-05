@@ -20,7 +20,7 @@
 <body>
   <div>
     <div class="wrapper">
-      <h1 style="font-family: &#39;Lato&#39;, sans-serif;">Knowledge-Base Poisoning Defense in Retrieval-Augmented Generation</h1>
+      <h1 style="font-family: &#39;Lato&#39;, sans-serif; font-weight: bold;">Knowledge-Base Poisoning Defense in Retrieval-Augmented Generation</h1>
       <h4 style="font-family: &#39;Lato&#39;, sans-serif; ">Spring 2026 CSCI 5541 NLP: Class Project - University of Minnesota</h4>
       <h4 style="font-family: &#39;Lato&#39;, sans-serif; ">NorthStar NLP</h4>
 
@@ -247,7 +247,7 @@ We remove alias-style sentences from the retrieved context before generation. Co
 <p>
 To evaluate our approach, we use Attack Success Rate (ASR) as the main metric, where a lower ASR means the model is less influenced by poisoned documents. We run experiments on a controlled set of 20 queries, each paired with semantically poisoned documents that introduce plausible but incorrect information. We compare a baseline RAG pipeline against several defenses, including prompting, few-shot prompting, retrieval filtering, and top-1 removal.
 </p>
-<table> <thead> <tr> <th style="text-align: center"><strong>Method</strong></th> <th style="text-align: center">Baseline</th> <th style="text-align: center">Prompting</th> <th style="text-align: center">Few-Shot</th> <th style="text-align: center">Filtering</th> <th style="text-align: center">Top-1 Removal</th> </tr> </thead> <tbody> <tr> <td style="text-align: center"><strong>ASR (↓)</strong></td> <td style="text-align: center">55%</td> <td style="text-align: center">60%</td> <td style="text-align: center">40%</td> <td style="text-align: center">25%</td> <td style="text-align: center">20%</td> </tr> <tr> <td style="text-align: center"><strong>Observation</strong></td> <td style="text-align: center">Highly vulnerable</td> <td style="text-align: center">Slightly worse</td> <td style="text-align: center">Some improvement</td> <td style="text-align: center">Strong improvement</td> <td style="text-align: center">Best overall</td> </tr> </tbody> <caption>Table 1. Attack Success Rate (ASR) for semantic poisoning defense (lower is better).</caption> </table>
+<table> <thead> <tr> <th style="text-align: center"><strong>Method</strong></th> <th style="text-align: center">Baseline</th> <th style="text-align: center">Prompting</th> <th style="text-align: center">Few-Shot</th> <th style="text-align: center">Filtering</th> <th style="text-align: center">Top-1 Removal</th> </tr> </thead> <tbody> <tr> <td style="text-align: center"><strong>ASR (↓)</strong></td> <td style="text-align: center">55%</td> <td style="text-align: center">60%</td> <td style="text-align: center">40%</td> <td style="text-align: center">25%</td> <td style="text-align: center">15%</td> </tr> <tr> <td style="text-align: center"><strong>Observation</strong></td> <td style="text-align: center">Highly vulnerable</td> <td style="text-align: center">Slightly worse</td> <td style="text-align: center">Some improvement</td> <td style="text-align: center">Strong improvement</td> <td style="text-align: center">Best overall</td> </tr> </tbody> <caption>Table 1. Attack Success Rate (ASR) for semantic poisoning defense (lower is better).</caption> </table>
 <br>
 
 <p>
@@ -420,6 +420,30 @@ Our benchmark is small (20 queries per poisoning style) and uses one main corpus
 Future work includes expanding the benchmark size, adding a clean-only utility evaluation (accuracy on a non-poisoned KB), and testing additional retrievers and reader models. For semantic poisoning, retrieval-time methods (filtering/down-ranking) look most promising. For contradictory poisoning, stronger sanitization patterns and lightweight post-processing rules that remove alias phrases from final outputs may further reduce leakage.
 </p>
 
+
+<hr>
+
+<h2 id="references">References</h2>
+
+<p style="margin-bottom: 10px;">
+Haoze Guo and Ziqi Wei. 2026. Hidden-in-plain-text: A
+benchmark for social-web indirect prompt injection
+in rag. <i>ArXiv</i>, abs/2601.10923.
+</p>
+
+<p style="margin-bottom: 10px;">
+Yang Jiao, Xiaodong Wang, and Kai Yang. 2025. Pr-
+attack: Coordinated prompt-rag attacks on retrieval-
+augmented generation in large language models via
+bilevel optimization.
+</p>
+
+<p style="margin-bottom: 10px;">
+Yizhou Zou, Xinyun Chen, Yang Liu, and Bo Li.
+2025. Poisonedrag: Knowledge poisoning attacks
+to retrieval-augmented generation systems. In <i>Proceedings of the 34th USENIX Security Symposium
+(USENIX Security 2025)</i>. USENIX Association.
+</p>
 
 <hr>
 
