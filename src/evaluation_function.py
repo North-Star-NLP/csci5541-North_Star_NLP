@@ -5,7 +5,7 @@ import re
 import numpy as np
 import pacmap
 import plotly.express as pxfrom 
-collections import Counter
+from collections import Counter
 
 
 def _extract_json_block(text: str):
