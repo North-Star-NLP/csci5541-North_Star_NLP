@@ -27,40 +27,20 @@
       <div class="authors-wrapper">
         
         <div class="author-container">
-          <div class="author-image">
-                        
-              <img src="files/headshot_placeholder.png" alt="Logan Oakley">
-            
-            
-          </div>
-          <p>
-                        
-              Logan <br> Oakley
-
+          <p style="white-space: nowrap;">
+            Logan Oakley
           </p>
         </div>
         
         <div class="author-container">
-          <div class="author-image">
-            
-            <img src="files/headshot_placeholder.png" alt="Zhixing Jiang">
-            
-          </div>
-          <p>
-            
-            Zhixing (Sean) <br> Jiang
-            
+          <p style="white-space: nowrap;">
+            Zhixing (Sean) Jiang
           </p>
         </div>
         
         <div class="author-container">
-          <div class="author-image">
-            
-              <img src="files/headshot_placeholder.png" alt="Samuel Kekeocha">            
-            
-          </div>
-          <p>
-              Samuel <br> Kekeocha
+          <p style="white-space: nowrap;">
+            Samuel Kekeocha
           </p>
         </div>
         
@@ -91,8 +71,8 @@
           </span>      
           <span class="link-block">
             <a
-              href=""
-              target="_blank"
+              href="#experimental-setup"
+              target="_self"
               class="external-link button is-normal is-rounded is-dark is-outlined"
             >
             <span>Model Weights</span>
@@ -122,37 +102,26 @@
 
 <hr>
 
-<h2 id="teaser">Teaser Figure</h2>
+<h2 id="attack-overview">Attack Overview</h2>
 
-<p>A figure that conveys the main idea behind the project or the main application being addressed. This figure is from <a href="https://arxiv.org/pdf/2210.07469">StyLEx</a>.</p>
+<p>Retrieval-augmented generation (RAG) systems retrieve relevant documents to ground LLM responses. However, this introduces a security vulnerability: if an attacker injects poisoned documents into the knowledge base, the model may retrieve and rely on these misleading sources, producing incorrect or manipulated answers. The figure below illustrates this key idea—a malicious document designed to appear relevant can steer the model toward attacker-intended responses.</p>
 
 <figure style="text-align: center;">
   <img src="./files/PoisonRAG.png" alt="PoisonRAG Overview" style="max-width: 100%;">
   <figcaption>
-    Figure 1. Overview of PoisonedRAG. A malicious document is injected into the knowledge base to steer the model toward a target answer for a specific query.
+    Figure 1. Overview of knowledge-base poisoning in RAG. An attacker injects a malicious document into the knowledge base that appears highly relevant to specific queries, causing the model to generate incorrect answers.
   </figcaption>
 </figure>
-
-
-<h3 id="the-timeline-and-the-highlights">Any subsection</h3>
-
-<p>If you need to explain more about your figure</p>
 
 <hr>
 
 <h2 id="introduction">Introduction / Background / Motivation</h2>
 
 <p>
-<b>What did you try to do? What problem did you try to solve? Articulate your objectives using absolutely no jargon.</b>
-</p>
-<p>
 In this project, we investigated how adversarial documents injected into a search system can trick an AI model into giving wrong answers. Specifically, we wanted to understand: (1) how often models fall for poisoned evidence when retrieving information to answer questions, and (2) whether we can develop defensive strategies to protect the model while keeping it useful. The problem we addressed is that retrieval-based systems like RAG introduce a new vulnerability—attackers can slip misleading documents into the knowledge base that appear relevant to specific queries. When the model treats these poisoned documents as trustworthy evidence, it produces incorrect responses. We built a controlled testing benchmark and evaluated multiple defense strategies—including prompting techniques and document filtering methods—measuring how well each one prevents attacks while still keeping the system accurate on normal questions. Our goal was to understand the tradeoff between security and utility: whether stronger protections against poisoned information also hurt the model's ability to answer correctly when documents are legitimate.
 </p>
 
-<p>
-<b>How is it done today, and what are the limits of current practice?</b>
 
-</p>
 
 <h2>Literature Review</h2>
 <h3>PoisonRag</h3>
@@ -180,7 +149,7 @@ In this project, we investigated how adversarial documents injected into a searc
   To support systematic evaluation, the benchmark includes an end-to-end pipeline for ingestion, retrieval, and generation, along with multiple retriever choices, generator templates, baselines, and evaluation metrics. 
   Using this framework, the authors measure how well existing defenses against prompt injection reduce attack success rate in realistic web-based RAG scenarios. The benchmark highlights that indirect attacks can be delivered through seemingly ordinary online content, making them difficult to detect through simple filtering alone.</p>
 
-<b>Who cares? If you are successful, what difference will it make?</b>
+<h2>Audience</h2>
 </p>
 <p>
 This work improves the reliability and trustworthiness of retrieval-augmented generation (RAG) systems in real-world applications that depend on external and often untrusted data sources, such as enterprise search, technical documentation assistants, and web-based question answering. By defending against knowledge-base poisoning, we reduce the risk that a small number of adversarial documents can manipulate model outputs, leading to incorrect or misleading responses. This is particularly important in high-stakes settings where accuracy and robustness are critical, and more broadly contributes to building AI systems that can safely and effectively leverage large-scale, open-domain knowledge.
@@ -230,14 +199,31 @@ At the prompt level, we design strategies that guide the model to reason more ca
 <h4><b>Contradictory Poisoning Defense</b></h4>
 
 <hr>
+
+<h2 id="experimental-setup">Experimental Setup</h2>
+
+<p>
+<b>Knowledge Base and Embeddings:</b> We construct the knowledge base using the <a href="https://huggingface.co/datasets/m-ric/huggingface_doc" target="_blank">m-ric/huggingface_doc</a> dataset, which contains comprehensive documentation for HuggingFace libraries (Transformers, Datasets, etc.). Documents are segmented into 512-token chunks using recursive character-based splitting, embedded with the <a href="https://huggingface.co/thenlper/gte-small" target="_blank">thenlper/gte-small</a> sentence transformer, and indexed in a FAISS vector store for efficient retrieval.
+</p>
+
+<p>
+<b>Poisoned Documents:</b> A total of 40 poisoned documents are injected into the knowledge base. Twenty employ semantic poisoning, introducing plausible but factually incorrect alternative implementations, while the remaining 20 employ contradictory poisoning, presenting conflicting statements. Each poisoned document is aligned with a specific query to maximize attack effectiveness.
+</p>
+
+<p>
+<b>Models and Inference:</b> The RAG pipeline uses two language models: <a href="https://huggingface.co/HuggingFaceH4/zephyr-7b-beta" target="_blank">HuggingFaceH4/zephyr-7b-beta</a> (7B parameters) as the reader model for question answering, and <a href="https://huggingface.co/Qwen/Qwen2.5-3B-Instruct" target="_blank">Qwen2.5-3B-Instruct</a> (3B parameters) as the judge model to determine whether generated responses align with poisoned or clean information. Both models operate under deterministic inference settings with greedy decoding (temperature=0.0, do_sample=False) to ensure reproducible results.
+</p>
+
+<p>
+<b>Evaluation Benchmark:</b> The evaluation consists of 20 questions targeting common misconceptions about the HuggingFace API, each paired with corresponding clean and poisoned reference answers. This benchmark allows us to measure Attack Success Rate (ASR) across different defense strategies.
+</p>
+
+<hr>
     
 <h2 id="results">Results</h2>
 
 <h4><b>Semantic Poisoning Defense</b></h4>
 
-<p>
-<b>How did you measure success? What experiments were used? What were the results, both quantitative and qualitative? Did you succeed? Did you fail? Why?</b>
-</p>
 <p>
 To evaluate our approach, we use Attack Success Rate (ASR) as the main metric, where a lower ASR means the model is less influenced by poisoned documents. We run experiments on a controlled set of 20 queries, each paired with semantically poisoned documents that introduce plausible but incorrect information. We compare a baseline RAG pipeline against several defenses, including prompting, few-shot prompting, retrieval filtering, and top-1 removal.
 </p>
